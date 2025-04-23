@@ -13,24 +13,35 @@ PACKING_UNIT = {
 }
 
 def extract_weight(text: str) -> float:
-    """
-    옵션 문자열에서 무게/수량 숫자 추출 (kg, g, 개입 등)
-    """
-    if "kg" in text.lower():
-        return float(re.search(r"(\\d+(\\.\\d+)?)\\s*kg", text.lower()).group(1))
-    elif "g" in text.lower():
-        return float(re.search(r"(\\d+(\\.\\d+)?)\\s*g", text.lower()).group(1)) / 1000
-    elif "개입" in text.lower():
-        return float(re.search(r"(\\d+)개입", text).group(1)) / 10
-    elif "팩" in text:
-        return float(re.search(r"(\\d+)팩", text).group(1)) * 0.2
+    text = text.lower()
+
+    if "kg" in text:
+        match = re.search(r"(\d+(\.\d+)?)\s*kg", text)
+        if match:
+            return float(match.group(1))
+
+    if "g" in text:
+        match = re.search(r"(\d+(\.\d+)?)\s*g", text)
+        if match:
+            return float(match.group(1)) / 1000
+
+    if "개입" in text:
+        match = re.search(r"(\d+)개입", text)
+        if match:
+            return float(match.group(1)) / 10
+
+    if "팩" in text:
+        match = re.search(r"(\d+)팩", text)
+        if match:
+            return float(match.group(1)) * 0.2
+
     return 1.0
 
 def get_base_product_name(option: str) -> str:
     """
     무게나 수량 제외한 정제 상품명만 반환 (패킹리스트에 표시될 이름)
     """
-    return re.sub(r"(\\d+(\\.\\d+)?)(kg|g|개입|팩)", "", option).strip()
+    return re.sub(r"(\d+(\.\d+)?)(kg|g|개입|팩)", "", option).strip()
 
 def generate_packing_list(input_path: str, output_path: str, option_col: str = "정제옵션", count_col: str = "수량") -> None:
     df = pd.read_excel(input_path)
@@ -51,4 +62,19 @@ def generate_packing_list(input_path: str, output_path: str, option_col: str = "
             unit = 1.0
 
             if "** 업 소 용 **" in opt:
-                unit = extract_weight(opt)
+                unit = extract_weight(opt)  # 원시무게 사용
+            else:
+                for keyword, factor in PACKING_UNIT.items():
+                    if keyword in opt and isinstance(factor, (int, float)):
+                        unit = extract_weight(opt) / factor
+                        break
+
+            summary[name] += count * unit
+
+    out_df = pd.DataFrame([
+        {"단위": "EA", "상품명": name, "수량": round(qty)}
+        for name, qty in summary.items()
+    ])
+
+    out_df.to_excel(output_path, index=False)
+    print(f"✅ 패킹리스트 저장 완료: {output_path}")
