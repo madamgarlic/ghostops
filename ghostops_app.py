@@ -38,6 +38,15 @@ if uploaded_files:
         clean_order_file(input_path, output_path, option_col_name)
         cleaned_files.append(output_path)
 
+        # 💾 정제된 개별 파일 다운로드 버튼 표시
+        with open(output_path, "rb") as f:
+            st.download_button(
+                label=f"📄 정제파일 다운로드 - {file.name}",
+                data=f.read(),
+                file_name=f"정제_{file.name}",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
     # 패킹리스트 생성
     packing_path = os.path.join(temp_dir, "패킹리스트.xlsx")
     generate_packing_list(cleaned_files[0], packing_path)
@@ -48,7 +57,7 @@ if uploaded_files:
     generate_invoice_and_summary(cleaned_files, invoice_path, summary_path)
 
     # 결과 다운로드
-    st.header("📤 다운로드")
+    st.header("📤 결과 다운로드")
     st.download_button("📦 패킹리스트 다운로드", open(packing_path, "rb").read(), file_name="패킹리스트.xlsx")
     st.download_button("🚚 송장리스트 다운로드", open(invoice_path, "rb").read(), file_name="송장리스트.xlsx")
     st.download_button("🧾 요약시트 다운로드", open(summary_path, "rb").read(), file_name="송장요약.xlsx")
