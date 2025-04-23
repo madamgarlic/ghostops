@@ -6,6 +6,12 @@ from parsers.order_cleaner import clean_order_file
 from generators.packing_list import generate_packing_list
 from generators.invoice_list import generate_invoice_and_summary
 
+def detect_option_column(df, possible_names=["옵션", "옵션정보", "상세정보", "옵션명"]) -> str:
+    for name in possible_names:
+        if name in df.columns:
+            return name
+    raise ValueError("옵션 열을 찾을 수 없습니다. ('옵션정보', '옵션', '옵션명', '상세정보' 중 하나 필요)")
+
 st.set_page_config(page_title="ghostops 자동화", layout="wide")
 st.title("🧄 ghostops | 마늘귀신 발주 자동화 시스템")
 
@@ -23,7 +29,10 @@ if uploaded_files:
         with open(input_path, "wb") as f:
             f.write(file.getbuffer())
 
-        clean_order_file(input_path, output_path)
+       df_temp = pd.read_excel(input_path)
+option_col_name = detect_option_column(df_temp)
+clean_order_file(input_path, output_path, option_col_name)
+
         cleaned_files.append(output_path)
 
     # 패킹리스트
