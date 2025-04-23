@@ -51,4 +51,4 @@ def generate_packing_list(input_path: str, output_path: str, option_col: str = "
             unit = 1.0
 
             if "** 업 소 용 **" in opt:
-                unit = extract_weight_
+                unit = extract_weight(opt)
