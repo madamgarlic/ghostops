@@ -1,14 +1,18 @@
 import re
 
-SIZES = ["소", "중", "대"]
+SIZES = ["특", "대", "중", "소"]
 WEIGHT_PATTERN = r"(\d+(\.\d+)?)(kg|g|개입|팩)"
+
 
 def parse_garlic(text: str) -> str:
     tags = []
     t = text.lower()
 
+    # : 기준 뒤만 남김
     if ":" in t:
         t = t.split(":")[-1].strip()
+
+    # / 포함 처리
     if "/" in t:
         parts = t.split("/")
         if any(":" in p for p in parts[1:]):
@@ -19,14 +23,17 @@ def parse_garlic(text: str) -> str:
         else:
             t = parts[0].strip()
 
-    if "업소용" in t or "벌크" in t or "대용량" in t or re.search(r"\b[5-9]\s*kg\b", t):
+    # 업소용 여부
+    if any(x in t for x in ["업소용", "벌크", "대용량"]) or re.search(r"\b[5-9]\s*kg\b", t):
         tags.append("** 업 소 용 **")
 
+    # 품종
     if "육쪽" in t:
         tags.append("♣ 육 쪽 ♣")
     elif "깐마늘" in t or "다진마늘" in t:
         tags.append("대서")
 
+    # 형태
     if "깐마늘" in t:
         tags.append("깐마늘")
     elif "다진마늘" in t:
@@ -34,20 +41,25 @@ def parse_garlic(text: str) -> str:
     elif "마늘쫑" in t:
         tags.append("마늘쫑")
 
-    if "다진마늘" not in t:
-        for size in SIZES:
-            if size in t:
-                tags.append(size)
-                break
+    # 크기
+    for size in SIZES:
+        if size in t:
+            tags.append(size)
+            break
 
+    # 꼭지유무
     if "꼭지포함" in t or "꼭지 포함" in t:
         tags.append("* 꼭 지 포 함 *")
+    elif "꼭지제거" in t:
+        tags.append("꼭지제거")
 
+    # 무게 추출
     match = re.search(WEIGHT_PATTERN, t)
     if match:
         tags.append(f"{match.group(1)}{match.group(3)}")
 
     return " ".join(tags)
+
 
 def parse_dakbal(text: str) -> str:
     t = text.lower()
@@ -60,6 +72,7 @@ def parse_dakbal(text: str) -> str:
     grams = sum(map(int, re.findall(r"(\d+)g", t)))
     pack_count += round(grams / 200)
     return f"무뼈닭발 {pack_count}팩"
+
 
 def parse_special(text: str) -> str:
     t = text.lower()
@@ -77,6 +90,7 @@ def parse_special(text: str) -> str:
         if match:
             return f"마늘가루 {match.group(1)}{match.group(3)}"
     return t.strip()
+
 
 def parse_option(text: str) -> list:
     parts = re.split(r"\+|/", text)
