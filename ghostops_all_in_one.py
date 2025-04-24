@@ -13,10 +13,10 @@ def simplify_named_option(text: str) -> str:
     return text
 
 def extract_total_weight(text: str) -> float:
-    match = re.search(r"총\\s*(\\d+(\\.\\d+)?)\\s*kg", text.lower())
+    match = re.search(r"총\s*(\d+(\.\d+)?)\s*kg", text.lower())
     if match:
         return float(match.group(1))
-    weights = [float(m.group(1)) for m in re.finditer(r"(\\d+(\\.\\d+)?)\\s*kg", text.lower())]
+    weights = [float(m.group(1)) for m in re.finditer(r"(\d+(\.\d+)?)\s*kg", text.lower())]
     return sum(weights)
 
 def parse_option(text: str) -> str:
@@ -25,7 +25,7 @@ def parse_option(text: str) -> str:
     text = text.lower()
 
     # 업소용
-    is_bulk = any(k in text for k in ["대용량", "벌크", "업소용"]) or re.search(r"\\b[5-9]\\s*kg\\b", text)
+    is_bulk = any(k in text for k in ["대용량", "벌크", "업소용"]) or re.search(r"\b[5-9]\s*kg\b", text)
 
     # 마늘 여부
     if "마늘" in text:
@@ -71,7 +71,7 @@ def parse_option(text: str) -> str:
 
     # 무뼈닭발
     if "무뼈닭발" in text:
-        packs = re.findall(r"(\\d+)\\s*팩", text)
+        packs = re.findall(r"(\d+)\s*팩", text)
         if not packs:
             grams = extract_total_weight(text) * 1000
             packs = int(grams // 200)
@@ -81,19 +81,19 @@ def parse_option(text: str) -> str:
 
     # 마늘빠삭이
     if "마늘빠삭이" in text:
-        pcs = re.search(r"(\\d+)개입", text)
+        pcs = re.search(r"(\d+)개입", text)
         return f"마늘빠삭이 {pcs.group(1)}개입" if pcs else "마늘빠삭이"
 
     # 마늘가루
     if "마늘가루" in text:
-        match = re.search(r"(\\d+)(g|G)", text)
+        match = re.search(r"(\d+)(g|G)", text)
         return f"마늘가루 {match.group(1)}g" if match else "마늘가루"
 
     return text
 
 # ---------------------- Streamlit UI ----------------------
 st.set_page_config(page_title="ghostops 올인원", layout="wide")
-st.title("🧄 ghostops | 올인원 정제 시스템")
+st.title("\ud83e\udc84 ghostops | 올인원 정제 시스템")
 
 uploaded_files = st.file_uploader("발주서 파일 업로드 (.xlsx)", type="xlsx", accept_multiple_files=True)
 if uploaded_files:
@@ -115,6 +115,6 @@ if uploaded_files:
         if option_col:
             df[option_col] = df[option_col].fillna("").apply(lambda x: " + ".join(parse_option(str(x).strip()) for x in x.split("+") if x))
             df.to_excel(output_path, index=False)
-            st.download_button(f"📄 {file.name} 정제 다운로드", open(output_path, "rb").read(), file_name=f"정제_{file.name}")
+            st.download_button(f"\ud83d\udcc4 {file.name} 정제 다운로드", open(output_path, "rb").read(), file_name=f"정제_{file.name}")
         else:
             st.error(f"{file.name}: 옵션열을 찾을 수 없습니다.")
