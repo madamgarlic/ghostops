@@ -34,7 +34,7 @@ def parse_option(text: str) -> str:
             tag.append("** 업 소 용 **")
 
         if "육쪽" in text:
-            tag.append("\u2663 육 쪽 \u2663")
+            tag.append("♣ 육 쪽 ♣")
         elif "대서" not in text:
             tag.append("대서")
 
@@ -93,7 +93,7 @@ def parse_option(text: str) -> str:
 
 # ---------------------- Streamlit UI ----------------------
 st.set_page_config(page_title="ghostops 올인원", layout="wide")
-st.title("\ud83e\udc84 ghostops | 올인원 정제 시스템")
+st.title("🧄 ghostops | 올인원 정제 시스템")
 
 uploaded_files = st.file_uploader("발주서 파일 업로드 (.xlsx)", type="xlsx", accept_multiple_files=True)
 if uploaded_files:
@@ -115,6 +115,6 @@ if uploaded_files:
         if option_col:
             df[option_col] = df[option_col].fillna("").apply(lambda x: " + ".join(parse_option(str(x).strip()) for x in x.split("+") if x))
             df.to_excel(output_path, index=False)
-            st.download_button(f"\ud83d\udcc4 {file.name} 정제 다운로드", open(output_path, "rb").read(), file_name=f"정제_{file.name}")
+            st.download_button(f"📄 {file.name} 정제 다운로드", open(output_path, "rb").read(), file_name=f"정제_{file.name}")
         else:
             st.error(f"{file.name}: 옵션열을 찾을 수 없습니다.")
