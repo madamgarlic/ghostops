@@ -1,98 +1,111 @@
-# ghostops_all_in_one.py (정밀 정제 시스템)
+# ghostops_all_in_one.py (마늘귀신 올인원 발주 매니저)
 import streamlit as st
 import pandas as pd
 import re
-import tempfile
 import os
+import tempfile
 from collections import defaultdict
 
-# ---------------------- 정제 도우미 ----------------------
-def simplify_named_option(text: str) -> str:
-    parts = [p.strip() for p in text.split("/") if p.strip()]
-    for part in reversed(parts):
-        if ":" in part:
-            return part.split(":")[-1].strip()
-    if ":" in text:
-        return text.split(":")[-1].strip()
-    return parts[0] if parts else text.strip()
+# ----------------------------- 정제 조건 -----------------------------
+MANDATORY_COLUMNS = {
+    '11번가': {'수령인': '수취인', '전화번호': '휴대폰번호', '상품명': '정제옵션'},
+    '스마트스토어': {'수령인': '수취인명', '전화번호': '수취인연락처1', '상품명': '정제옵션'},
+    'ESM': {'수령인': '수취인명', '전화번호': '수취인 휴대폰', '상품명': '정제옵션'},
+    '카카오': {'수령인': '수취인명', '전화번호': '하이픈포함수취인연락처1', '상품명': '정제옵션'},
+}
 
-def extract_combined_weight(text: str) -> float:
-    total_match = re.search(r"총\s*(\d+(\.\d+)?)\s*kg", text.lower())
-    if total_match:
-        return float(total_match.group(1))
-    weights = [float(m.group(1)) for m in re.finditer(r"(\d+(\.\d+)?)\s*kg", text.lower())]
-    return sum(weights)
+UNIT_TABLE = {
+    '마늘류': 1,  # kg
+    '마늘쫑': 1,  # kg
+    '무뼈닭발': 0.2,  # 팩
+    '마늘빠삭이': 10,  # 박스 (10개입)
+    '마늘가루': 0.1,  # 100g
+}
+
+# ----------------------------- 정제 도우미 -----------------------------
+def clean_text(text: str) -> str:
+    text = re.sub(r'[\[\](){}]', '', text)
+    text = text.replace('/', ' ').replace(':', ' ').strip()
+    return text
+
+def extract_weight(text: str) -> float:
+    text = text.lower()
+    total = 0.0
+    matches = re.findall(r'(\d+(\.\d+)?)\s*kg', text)
+    for match in matches:
+        total += float(match[0])
+    return total
 
 def parse_option(text: str) -> str:
-    original = text
-    text = simplify_named_option(text)
-    text = re.sub(r"[\[\](){}]", "", text)
+    text = clean_text(text)
     text = text.lower()
-
-    is_bulk = any(k in text for k in ["대용량", "벌크", "업소용"]) or re.search(r"\b[5-9]\s*kg\b", text)
-
-    if "무뼈닭발" in text:
-        direct = re.findall(r"(\d+)\s*팩", text)
-        if direct:
-            return f"무뼈닭발 {sum(map(int, direct))}팩"
-        match = re.search(r"200\s*g\s*[xX*]\s*(\d+)", text)
-        if match:
-            return f"무뼈닭발 {int(match.group(1))}팩"
-        grams = sum([float(g) for g in re.findall(r"(\d+(\.\d+)?)\s*g", text)])
-        return f"무뼈닭발 {int(grams // 200)}팩" if grams else "정제불가: " + original
-
-    if "마늘빠삭이" in text:
-        pcs = re.search(r"(\d+)개입", text)
-        return f"마늘빠삭이 {pcs.group(1)}개입" if pcs else "정제불가: " + original
-
-    if "마늘가루" in text:
-        match = re.search(r"(\d+)(g|G)", text)
-        return f"마늘가루 {match.group(1)}g" if match else "정제불가: " + original
-
-    if "마늘쫑" in text:
-        result = []
+    tags = []
+    
+    is_bulk = '업소용' in text or '벌크' in text or '대용량' in text or re.search(r'\b[5-9]\s*kg\b', text)
+    if '마늘' in text:
         if is_bulk:
-            result.append("** 업 소 용 **")
-        result.append("마늘쫑")
-        result.append(f"{int(extract_combined_weight(text))}kg")
-        return " ".join(result)
+            tags.append('** 업 소 용 **')
+        if '육쪽' in text:
+            tags.append('\u2663 육 쪽 \u2663')
+        elif '대서' not in text:
+            tags.append('대서')
+        if '다진마늘' in text:
+            tags.append('다진마늘')
+        elif '깐마늘' in text:
+            tags.append('깐마늘')
+        if '특' in text:
+            tags.append('특')
+        elif '대' in text:
+            tags.append('대')
+        elif '중' in text:
+            tags.append('중')
+        elif '소' in text:
+            tags.append('소')
+        if '꼭지포함' in text:
+            tags.append('* 꼭 지 포 함 *')
+        elif '꼭지제거' in text:
+            tags.append('꼭지제거')
+        weight = extract_weight(text)
+        if weight:
+            tags.append(f'{int(weight)}kg')
+        return ' '.join(tags)
+    
+    if '마늘쫑' in text:
+        parts = ['** 업 소 용 **'] if is_bulk else []
+        parts.append('마늘쫑')
+        parts.append(f'{int(extract_weight(text))}kg')
+        return ' '.join(parts)
+    
+    if '무뼈닭발' in text:
+        packs = re.findall(r'(\d+)\s*팩', text)
+        if packs:
+            total_packs = sum(map(int, packs))
+        else:
+            grams = extract_weight(text) * 1000
+            total_packs = int(grams // 200)
+        return f'무뼈닭발 {total_packs}팩'
 
-    if "마늘" in text:
-        tag = []
-        if is_bulk:
-            tag.append("** 업 소 용 **")
-        if "육쪽" in text:
-            tag.append("♣ 육 쪽 ♣")
-        elif "대서" not in text:
-            tag.append("대서")
-        if "다진마늘" in text:
-            tag.append("다진마늘")
-        elif "깐마늘" in text:
-            tag.append("깐마늘")
-        if "특" in text:
-            tag.append("특")
-        elif "대" in text:
-            tag.append("대")
-        elif "중" in text:
-            tag.append("중")
-        elif "소" in text:
-            tag.append("소")
-        if "꼭지포함" in text:
-            tag.append("* 꼭 지 포 함 *")
-        elif "꼭지제거" in text:
-            tag.append("꼭지제거")
-        tag.append(f"{int(extract_combined_weight(text))}kg")
-        return " ".join(tag)
+    if '마늘빠삭이' in text:
+        pcs = re.search(r'(\d+)개입', text)
+        if pcs:
+            return f'마늘빠삭이 {pcs.group(1)}개입'
+        return '마늘빠삭이'
 
-    return "정제불가: " + original
+    if '마늘가루' in text:
+        grams = re.search(r'(\d+)g', text.lower())
+        if grams:
+            return f'마늘가루 {grams.group(1)}g'
+        return '마늘가루'
 
-# ---------------------- Streamlit UI ----------------------
+    return text
+
+# ----------------------------- Streamlit UI -----------------------------
 st.set_page_config(page_title="ghostops 올인원", layout="wide")
-st.title("🧄 ghostops | 정밀 자동화 정제 시스템")
+st.title("\ud83e\uddc4 마늘귀신 | 올인원 발주 매니저")
 
-uploaded_files = st.file_uploader("발주서 파일 업로드 (.xlsx)", type="xlsx", accept_multiple_files=True)
+uploaded_files = st.file_uploader("발주서 파일 업로드 (xlsx/xls/csv)", type=["xlsx", "xls", "csv"], accept_multiple_files=True)
+
 if uploaded_files:
-    st.success(f"{len(uploaded_files)}개 파일 업로드 완료")
     temp_dir = tempfile.mkdtemp()
     cleaned_files = []
 
@@ -102,57 +115,60 @@ if uploaded_files:
         with open(input_path, "wb") as f:
             f.write(file.getbuffer())
 
-        df = pd.read_excel(input_path)
-        option_col = next((c for c in df.columns if any(k in c for k in ["옵션", "옵션정보", "옵션명"])), None)
-        if option_col:
-            df[option_col] = df[option_col].fillna("").apply(
-                lambda x: " + ".join(parse_option(part.strip()) for part in str(x).split("+") if part.strip())
-            )
+        try:
+            if file.name.endswith("csv"):
+                df = pd.read_csv(input_path)
+            else:
+                df = pd.read_excel(input_path)
+
+            option_col = next((c for c in df.columns if any(k in c for k in ["옵션", "옵션정보", "옵션명"])), None)
+            if not option_col:
+                raise ValueError("옵션열을 찾을 수 없습니다.")
+
+            df[option_col] = df[option_col].fillna("").apply(lambda x: " + ".join(parse_option(s) for s in str(x).split("+") if s))
             df.to_excel(output_path, index=False)
             cleaned_files.append(output_path)
-            st.download_button(f"📄 정제 결과 다운로드 - {file.name}", open(output_path, "rb").read(), file_name=f"정제_{file.name}")
-        else:
-            st.error(f"{file.name} - 옵션 열을 찾을 수 없습니다.")
+            st.download_button(f"📄 정제된 {file.name}", open(output_path, "rb").read(), file_name=f"정제_{file.name}")
+        except Exception as e:
+            st.error(f"{file.name} 처리 중 오류 발생: {str(e)}")
 
-    # ---------------------- 패킹리스트 생성 ----------------------
+    # 패킹리스트
     st.subheader("📦 패킹리스트")
     summary = defaultdict(float)
+
     for path in cleaned_files:
         df = pd.read_excel(path)
         option_col = next((c for c in df.columns if "옵션" in c), None)
         count_col = next((c for c in df.columns if "수량" in c), None)
-        if not option_col or not count_col:
-            continue
 
         for _, row in df.iterrows():
             options = str(row[option_col]).split(" + ")
             count = row[count_col]
             for opt in options:
-                if "정제불가" in opt:
-                    continue
+                base = opt
                 if "마늘가루" in opt:
-                    match = re.search(r"(\d+)(g)", opt)
-                    grams = int(match.group(1)) if match else 100
-                    summary["마늘가루"] += (grams / 100) * count
+                    grams = int(re.search(r'(\d+)g', opt).group(1)) if re.search(r'(\d+)g', opt) else 100
+                    qty = (grams / 100) * count
+                    summary["마늘가루"] += qty
                 elif "무뼈닭발" in opt:
-                    match = re.search(r"(\d+)팩", opt)
-                    qty = int(match.group(1)) * count if match else count
+                    packs = int(re.search(r'(\d+)팩', opt).group(1)) if re.search(r'(\d+)팩', opt) else 1
+                    qty = packs * count
                     summary["무뼈닭발"] += qty
                 elif "마늘빠삭이" in opt:
-                    match = re.search(r"(\d+)개입", opt)
-                    qty = (int(match.group(1)) / 10) * count if match else 0
+                    pcs = int(re.search(r'(\d+)개입', opt).group(1)) if re.search(r'(\d+)개입', opt) else 10
+                    qty = (pcs / 10) * count
                     summary["마늘빠삭이"] += qty
                 elif "마늘쫑" in opt:
-                    match = re.search(r"(\d+)kg", opt)
-                    qty = int(match.group(1)) * count if match else 0
+                    qty = int(re.search(r'(\d+)kg', opt).group(1)) * count if re.search(r'(\d+)kg', opt) else count
                     summary["마늘쫑"] += qty
-                elif "마늘" in opt:
-                    match = re.search(r"(\d+)kg", opt)
-                    qty = int(match.group(1)) * count if match else 0
-                    summary[opt] += qty
+                else:
+                    qty = int(re.search(r'(\d+)kg', opt).group(1)) * count if re.search(r'(\d+)kg', opt) else count
+                    summary[base] += qty
 
     if summary:
         df_pack = pd.DataFrame([{"상품명": k, "수량": int(v)} for k, v in summary.items()])
         pack_path = os.path.join(temp_dir, "패킹리스트.xlsx")
         df_pack.to_excel(pack_path, index=False)
         st.download_button("📥 패킹리스트 다운로드", open(pack_path, "rb").read(), file_name="패킹리스트.xlsx")
+
+# 끝
