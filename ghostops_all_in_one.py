@@ -7,6 +7,15 @@ import os
 from collections import defaultdict
 
 # ---------------------- 정제 도우미 ----------------------
+def read_file(input_path):
+    ext = os.path.splitext(input_path)[-1].lower()
+    if ext == ".csv":
+        return pd.read_csv(input_path)
+    elif ext in [".xls", ".xlsx"]:
+        return pd.read_excel(input_path, engine="openpyxl")
+    else:
+        raise ValueError("지원하지 않는 파일 형식입니다.")
+
 def simplify_named_option(text: str) -> str:
     parts = [p.strip() for p in text.split("/") if ":" in p]
     if len(parts) >= 2:
@@ -73,13 +82,7 @@ def parse_option(text: str) -> str:
 
     if "마늘빠삭이" in text:
         pcs = re.search(r"(\d+)개입", text)
-        if pcs:
-            count = int(pcs.group(1))
-            if count == 10:
-                return "마늘빠삭이 1박스"
-            else:
-                return f"마늘빠삭이 {count}개입"
-        return "마늘빠삭이"
+        return f"마늘빠삭이 {pcs.group(1)}개입" if pcs else "마늘빠삭이"
 
     if "마늘가루" in text:
         match = re.search(r"(\d+)(g|G)", text)
@@ -103,10 +106,10 @@ if uploaded_files:
         with open(input_path, "wb") as f:
             f.write(file.getbuffer())
 
-        df = pd.read_excel(input_path)
+        df = read_file(input_path)
         option_col = None
         for col in df.columns:
-            if any(key in col for key in ["옵션", "옵션정보", "옵션명"]):
+            if any(key in col.strip() for key in ["옵션", "옵션정보", "옵션명"]):
                 option_col = col
                 break
 
@@ -116,15 +119,22 @@ if uploaded_files:
             cleaned_files.append(output_path)
             st.download_button(f"📄 {file.name} 정제 다운로드", open(output_path, "rb").read(), file_name=f"정제_{file.name}")
         else:
-            st.error(f"{file.name}: 옵션열을 찾을 수 없습니다.")
+            st.error(f"{file.name}: 옵션열(옵션/옵션정보/옵션명)을 찾을 수 없습니다.")
 
     # ---------------------- 패킹리스트 생성 ----------------------
     st.subheader("📦 패킹리스트")
     summary = defaultdict(int)
+    unit_table = {
+        "마늘가루": 0.1,
+        "마늘쫑": 1,
+        "무뼈닭발": 0.2,
+        "마늘빠삭이": 10,
+        "마늘": 1
+    }
 
     for path in cleaned_files:
         df = pd.read_excel(path)
-        option_col = next((c for c in df.columns if any(k in c for k in ["옵션", "옵션정보", "옵션명"])), None)
+        option_col = next((c for c in df.columns if "옵션" in c), None)
         count_col = next((c for c in df.columns if "수량" in c), None)
         if not option_col or not count_col:
             continue
@@ -135,7 +145,7 @@ if uploaded_files:
             for opt in options:
                 base = opt
                 if any(k in opt for k in ["마늘가루"]):
-                    match = re.search(r"(\d+)(g)", opt)
+                    match = re.search(r"(\d+)g", opt)
                     grams = int(match.group(1)) if match else 100
                     qty = (grams / 100) * count
                     summary["마늘가루"] += qty
@@ -145,11 +155,8 @@ if uploaded_files:
                     summary["무뼈닭발"] += qty
                 elif "마늘빠삭이" in opt:
                     match = re.search(r"(\d+)개입", opt)
-                    if match:
-                        qty = int(match.group(1)) / 10 * count
-                        summary["마늘빠삭이"] += qty
-                    elif "1박스" in opt:
-                        summary["마늘빠삭이"] += count
+                    qty = (int(match.group(1)) / 10) * count if match else count
+                    summary["마늘빠삭이"] += qty
                 elif "마늘쫑" in opt:
                     match = re.search(r"(\d+)kg", opt)
                     qty = int(match.group(1)) * count if match else count
