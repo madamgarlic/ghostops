@@ -1,4 +1,4 @@
-# -------------------- 1. 라이브러리 임포트 --------------------
+# -------------------- 1. 라이브러리 임포트 및 기본 설정 --------------------
 import streamlit as st
 import pandas as pd
 import os
@@ -7,17 +7,15 @@ import tempfile
 from collections import defaultdict
 from datetime import datetime
 
-# -------------------- 2. Streamlit 기본 설정 --------------------
 st.set_page_config(page_title="Garlic Spirit | 올인원 발주 매니저", layout="wide")
 st.title("🧄 Garlic Spirit | 올인원 발주 매니저")
 
-# 파일 저장용 임시폴더
 TEMP_DIR = tempfile.mkdtemp()
-# -------------------- 3. 발주서 옵션 정제 함수 --------------------
+# -------------------- 2. 발주서 옵션 정제 함수 --------------------
 
 def clean_text(text):
     text = str(text)
-    text = re.sub(r'[\\[\\](){}]', '', text)
+    text = re.sub(r'[\[\](){}]', '', text)
     if '/' in text:
         parts = text.split('/')
         text = parts[-1] if ':' in parts[-1] else parts[0]
@@ -26,20 +24,17 @@ def clean_text(text):
     return text.strip()
 
 def extract_total_weight(text):
-    total = re.search(r'총\\s*(\\d+(\\.\\d+)?)\\s*kg', text.lower())
+    total = re.search(r'총\s*(\d+(\.\d+)?)\s*kg', text.lower())
     if total:
         return float(total.group(1))
-    weights = [float(m.group(1)) for m in re.finditer(r'(\\d+(\\.\\d+)?)\\s*kg', text.lower())]
+    weights = [float(m.group(1)) for m in re.finditer(r'(\d+(\.\d+)?)\s*kg', text.lower())]
     return sum(weights) if weights else 1.0
 
 def extract_info(text):
     text = clean_text(text)
     lower = text.lower()
 
-    if any(k in lower for k in ['대용량', '벌크', '업소용']) or re.search(r'\\b[5-9]\\s*kg\\b', lower):
-        bulk = True
-    else:
-        bulk = False
+    bulk = any(k in lower for k in ['대용량', '벌크', '업소용']) or re.search(r'\b[5-9]\s*kg\b', lower)
 
     if '마늘' in lower:
         tags = []
@@ -79,28 +74,26 @@ def extract_info(text):
         return ' '.join(tags)
 
     if '무뼈닭발' in lower:
-        packs = re.findall(r'(\\d+)\\s*팩', text)
+        packs = re.findall(r'(\d+)\s*팩', text)
         if not packs:
             grams = extract_total_weight(text) * 1000
             packs = int(grams // 200)
         else:
             packs = sum(map(int, packs))
-        return f\"무뼈닭발 {packs}팩\"
+        return f"무뼈닭발 {packs}팩"
 
     if '마늘빠삭이' in lower:
-        pcs = re.search(r'(\\d+)개입', text)
-        if pcs:
-            return f\"마늘빠삭이 {pcs.group(1)}개입\"
-        return '마늘빠삭이'
+        pcs = re.search(r'(\d+)개입', text)
+        return f"마늘빠삭이 {pcs.group(1)}개입" if pcs else '마늘빠삭이'
 
     if '마늘가루' in lower:
-        g = re.search(r'(\\d+)(g|G)', text)
+        g = re.search(r'(\d+)(g|G)', text)
         if g:
-            return f\"마늘가루 {g.group(1)}g\"
+            return f"마늘가루 {g.group(1)}g"
         return '마늘가루'
 
     return text
-# -------------------- 4. 패킹리스트 생성 함수 --------------------
+# -------------------- 3. 패킹리스트 및 송장리스트 생성 함수 --------------------
 
 def generate_packing_list(cleaned_files):
     summary = defaultdict(float)
@@ -109,55 +102,53 @@ def generate_packing_list(cleaned_files):
         "마늘쫑": 1,
         "무뼈닭발": 0.2,
         "마늘빠삭이": 10,
-        "마늘": 1  # 마늘류
+        "마늘": 1
     }
 
     for path in cleaned_files:
         df = pd.read_excel(path)
-        option_col = next((c for c in df.columns if "옵션" in c), None)
-        count_col = next((c for c in df.columns if "수량" in c), None)
+        option_col = next((c for c in df.columns if any(k in c for k in ['옵션', '옵션명', '옵션정보'])), None)
+        count_col = next((c for c in df.columns if '수량' in c), None)
         if not option_col or not count_col:
             continue
 
         for _, row in df.iterrows():
-            options = str(row[option_col]).split(" + ")
+            options = str(row[option_col]).split(' + ')
             count = row[count_col]
             for opt in options:
-                base = opt
                 if "마늘가루" in opt:
-                    match = re.search(r"(\\d+)g", opt)
+                    match = re.search(r'(\d+)g', opt)
                     grams = int(match.group(1)) if match else 100
                     qty = (grams / 100) * count
                     summary["마늘가루"] += qty
                 elif "무뼈닭발" in opt:
-                    match = re.search(r"(\\d+)팩", opt)
+                    match = re.search(r'(\d+)팩', opt)
                     qty = int(match.group(1)) * count if match else count
                     summary["무뼈닭발"] += qty
                 elif "마늘빠삭이" in opt:
-                    match = re.search(r"(\\d+)개입", opt)
+                    match = re.search(r'(\d+)개입', opt)
                     qty = int(match.group(1)) / 10 * count if match else count
                     summary["마늘빠삭이"] += qty
                 elif "마늘쫑" in opt:
-                    match = re.search(r"(\\d+)kg", opt)
+                    match = re.search(r'(\d+)kg', opt)
                     qty = int(match.group(1)) * count if match else count
                     summary["마늘쫑"] += qty
                 else:
-                    match = re.search(r"(\\d+)kg", opt)
+                    match = re.search(r'(\d+)kg', opt)
                     qty = int(match.group(1)) * count if match else count
-                    summary[base] += qty
+                    summary[opt] += qty
 
     df_pack = pd.DataFrame([{"상품명": k, "수량": int(v)} for k, v in summary.items()])
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     pack_path = os.path.join(TEMP_DIR, f"패킹리스트_{timestamp}.xlsx")
     df_pack.to_excel(pack_path, index=False)
     return pack_path
-# -------------------- 5. 송장리스트 생성 함수 --------------------
 
 def generate_invoice_list(cleaned_files):
     result = []
     for path in cleaned_files:
         df = pd.read_excel(path)
-        option_col = next((c for c in df.columns if "옵션" in c), None)
+        option_col = next((c for c in df.columns if any(k in c for k in ['옵션', '옵션명', '옵션정보'])), None)
         name_col = next((c for c in df.columns if "수령인" in c or "이름" in c), None)
         zip_col = next((c for c in df.columns if "우편번호" in c), None)
         addr1_col = next((c for c in df.columns if "주소" in c and "상세" not in c), None)
@@ -185,7 +176,8 @@ def generate_invoice_list(cleaned_files):
             })
 
     df_invoice = pd.DataFrame(result)
-    # 합배송 조건 검사
+
+    # 합배송 처리
     duplicates = df_invoice.duplicated(subset=["수령인", "우편번호", "주소", "전화번호"], keep=False)
     df_invoice.loc[duplicates, "수령인"] = "*" + df_invoice.loc[duplicates, "수령인"]
 
@@ -195,7 +187,7 @@ def generate_invoice_list(cleaned_files):
     invoice_path = os.path.join(TEMP_DIR, f"송장리스트_{timestamp}.xlsx")
     df_invoice.to_excel(invoice_path, index=False)
     return invoice_path
-# -------------------- 6. 메인 실행 흐름 --------------------
+# -------------------- 4. 메인 실행 흐름 --------------------
 
 uploaded_files = st.file_uploader("발주서 파일 업로드 (.xlsx, .xls, .csv)", type=['xlsx', 'xls', 'csv'], accept_multiple_files=True)
 
