@@ -75,7 +75,7 @@ def extract_info(text):
         tags = ['** 업 소 용 **'] if bulk else []
         tags.append('마늘쫑')
         total_weight = extract_total_weight(text)
-        tags.append(f\"{int(total_weight)}kg\")
+        tags.append(f"{int(total_weight)}kg")
         return ' '.join(tags)
 
     if '무뼈닭발' in lower:
