@@ -68,7 +68,7 @@ def extract_info(text):
             tags.append('꼭지제거')
 
         total_weight = extract_total_weight(text)
-        tags.append(f\"{int(total_weight)}kg\")
+        tags.append(f"{int(total_weight)}kg")
         return ' '.join(tags)
 
     if '마늘쫑' in lower:
