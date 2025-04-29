@@ -44,11 +44,11 @@ def extract_info(text):
             tags.append('♣ 육 쪽 ♣')
         else:
             tags.append('대서')
+
         if '다진마늘' in lower:
             tags.append('다진마늘')
         elif '깐마늘' in lower:
             tags.append('깐마늘')
-        if '다진마늘' not in lower:
             if '특' in lower:
                 tags.append('특')
             elif '대' in lower:
@@ -57,10 +57,12 @@ def extract_info(text):
                 tags.append('중')
             elif '소' in lower:
                 tags.append('소')
-        if '꼭지포함' in lower:
-            tags.append('* 꼭 지 포 함 *')
-        elif '꼭지제거' in lower:
-            tags.append('꼭지제거')
+
+        if '다진마늘' not in lower:
+            if '꼭지포함' in lower:
+                tags.append('* 꼭 지 포 함 *')
+            elif '꼭지제거' in lower:
+                tags.append('꼭지제거')
 
         total_weight = extract_total_weight(text)
         tags.append(f"{int(total_weight)}kg")
@@ -93,6 +95,7 @@ def extract_info(text):
         return '마늘가루'
 
     return text
+
 # -------------------- 3. 패킹리스트 및 송장리스트 생성 함수 --------------------
 
 def generate_packing_list(cleaned_files):
@@ -201,10 +204,13 @@ if uploaded_files:
         with open(file_path, 'wb') as f:
             f.write(uploaded_file.getbuffer())
 
-        try:
-            df = pd.read_excel(file_path)
-        except:
-            df = pd.read_csv(file_path, encoding='utf-8')
+      try:
+    df = pd.read_excel(file_path)
+except:
+    try:
+        df = pd.read_csv(file_path, encoding='utf-8')
+    except UnicodeDecodeError:
+        df = pd.read_csv(file_path, encoding='cp949')
 
         option_col = None
         for col in df.columns:
