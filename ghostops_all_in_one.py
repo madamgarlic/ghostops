@@ -199,28 +199,37 @@ if uploaded_files:
 
     cleaned_paths = []
 
-    for uploaded_file in uploaded_files:
-        file_path = os.path.join(TEMP_DIR, uploaded_file.name)
-        with open(file_path, 'wb') as f:
-            f.write(uploaded_file.getbuffer())
+     for file in uploaded_files:
+        input_path = os.path.join(temp_dir, file.name)
+        output_path = os.path.join(temp_dir, f"정제_{file.name}")
+        with open(input_path, "wb") as f:
+            f.write(file.getbuffer())
 
-      try:
-    df = pd.read_excel(file_path)
-except:
-    try:
-        df = pd.read_csv(file_path, encoding='utf-8')
-    except UnicodeDecodeError:
-        df = pd.read_csv(file_path, encoding='cp949')
+        try:
+            df = pd.read_excel(input_path)
+        except:
+            df = pd.read_csv(input_path, encoding='utf-8')
 
         option_col = None
         for col in df.columns:
-            if any(k in col for k in ['옵션', '옵션명', '옵션정보']):
+            if any(key in col for key in ["옵션", "옵션정보", "옵션명"]):
                 option_col = col
                 break
 
-        if option_col is None:
-            st.error(f"{uploaded_file.name} 파일: 옵션열을 찾을 수 없습니다.")
-            continue
+        if option_col:
+            df[option_col] = df[option_col].fillna("").apply(
+                lambda x: " + ".join(parse_option(str(x).strip()) for x in str(x).split("+") if x)
+            )
+            df.to_excel(output_path, index=False)
+            cleaned_files.append(output_path)
+            st.download_button(
+                f"📄 {file.name} 정제 다운로드",
+                open(output_path, "rb").read(),
+                file_name=f"정제_{file.name}"
+            )
+        else:
+            st.error(f"{file.name}: 옵션열을 찾을 수 없습니다.")
+
 
         df[option_col] = df[option_col].fillna('').apply(lambda x: ' + '.join(extract_info(opt.strip()) for opt in str(x).split('+') if opt.strip()))
         cleaned_path = os.path.join(TEMP_DIR, f"정제_{uploaded_file.name.split('.')[0]}.xlsx")
