@@ -195,11 +195,11 @@ def generate_invoice_list(cleaned_files):
 uploaded_files = st.file_uploader("발주서 파일 업로드 (.xlsx, .xls, .csv)", type=['xlsx', 'xls', 'csv'], accept_multiple_files=True)
 
 if uploaded_files:
-    st.success(f"{len(uploaded_files)}개 파일 업로드 완료!")
+    st.success(f"{len(uploaded_files)}개 파일 업로드 완료")
+    temp_dir = tempfile.mkdtemp()
+    cleaned_files = []
 
-    cleaned_paths = []
-
-     for file in uploaded_files:
+    for file in uploaded_files:
         input_path = os.path.join(temp_dir, file.name)
         output_path = os.path.join(temp_dir, f"정제_{file.name}")
         with open(input_path, "wb") as f:
@@ -212,31 +212,21 @@ if uploaded_files:
 
         option_col = None
         for col in df.columns:
-            if any(key in col for key in ["옵션", "옵션정보", "옵션명"]):
+            if any(key in col for key in ["옵션", "옵션명", "옵션정보"]):
                 option_col = col
                 break
 
-        if option_col:
-            df[option_col] = df[option_col].fillna("").apply(
-                lambda x: " + ".join(parse_option(str(x).strip()) for x in str(x).split("+") if x)
-            )
-            df.to_excel(output_path, index=False)
-            cleaned_files.append(output_path)
-            st.download_button(
-                f"📄 {file.name} 정제 다운로드",
-                open(output_path, "rb").read(),
-                file_name=f"정제_{file.name}"
-            )
-        else:
-            st.error(f"{file.name}: 옵션열을 찾을 수 없습니다.")
+        if option_col is None:
+            st.error(f"{file.name} 파일: 옵션열을 찾을 수 없습니다.")
+            continue
 
+        df[option_col] = df[option_col].fillna("").apply(
+            lambda x: " + ".join(parse_option(str(p).strip()) for p in str(x).split("+") if p)
+        )
 
-        df[option_col] = df[option_col].fillna('').apply(lambda x: ' + '.join(extract_info(opt.strip()) for opt in str(x).split('+') if opt.strip()))
-        cleaned_path = os.path.join(TEMP_DIR, f"정제_{uploaded_file.name.split('.')[0]}.xlsx")
-        df.to_excel(cleaned_path, index=False)
-        cleaned_paths.append(cleaned_path)
-
-        st.download_button(f"📄 정제 파일 다운로드 - {uploaded_file.name}", open(cleaned_path, 'rb').read(), file_name=f"정제_{uploaded_file.name}")
+        df.to_excel(output_path, index=False)
+        cleaned_files.append(output_path)
+        st.download_button(f"📄 {file.name} 정제 다운로드", open(output_path, "rb").read(), file_name=f"정제_{file.name}")
 
     if cleaned_paths:
         st.subheader("📦 패킹리스트 / 송장리스트 생성")
