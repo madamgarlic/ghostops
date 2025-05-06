@@ -50,9 +50,8 @@ def parse_option(text: str) -> str:
     if "마늘쫑" in text:
         weight_match = re.search(r"(\d+(\.\d+)?)\s*kg", text)
         weight = weight_match.group(1) if weight_match else ""
-        is_bulk = "10kg" in text or "대용량" in text or "벌크" in text or "업소용" in text
         result = []
-        if is_bulk:
+        if "10kg" in text:
             result.append("** 업 소 용 **")
         result.append("마늘쫑")
         if weight:
@@ -62,7 +61,7 @@ def parse_option(text: str) -> str:
     # 마늘류 정제
     if "마늘" in text:
         tag = []
-        if "10kg" in text or "대용량" in text or "벌크" in text or "업소용" in text:
+        if "10kg" in text:
             tag.append("** 업 소 용 **")
         if "육쪽" in text:
             tag.append("♣ 육 쪽 ♣")
@@ -89,7 +88,7 @@ def parse_option(text: str) -> str:
         match = re.search(r"(\d+(\.\d+)?)\s*kg", text)
         if match:
             tag.append(f"{match.group(1)}kg")
-        return " ".join(tag)
+        return " " .join(tag)
 
     return text
 
