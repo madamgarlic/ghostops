@@ -1,11 +1,12 @@
-# garlic_cleaner.py
 import streamlit as st
 import pandas as pd
 import os
 import re
 import tempfile
 
-# 1. 무게 추출 보조 함수
+# ------------------------
+# 💡 무게 추출 함수
+# ------------------------
 def extract_total_weight(text: str) -> float:
     match = re.search(r"총\s*(\d+(\.\d+)?)\s*kg", text.lower())
     if match:
@@ -13,12 +14,39 @@ def extract_total_weight(text: str) -> float:
     weights = [float(m.group(1)) for m in re.finditer(r"(\d+(\.\d+)?)\s*kg", text.lower())]
     return sum(weights)
 
-# 2. 정제 핵심 함수
+# ------------------------
+# 💡 정제 함수
+# ------------------------
 def parse_option(text: str) -> str:
     text = re.sub(r"[\[\](){}]", "", text)
     text = text.lower()
 
-    # 2-1. 마늘류
+    # ✅ 마늘빠삭이
+    if "마늘빠삭이" in text:
+        pcs = re.search(r"(\d+)\s*개입", text)
+        return f"마늘빠삭이 {pcs.group(1)}개입" if pcs else "마늘빠삭이"
+
+    # ✅ 무뼈닭발
+    if "무뼈닭발" in text:
+        match = re.search(r"(\d+)\s*팩", text)
+        count = int(match.group(1)) if match else int(extract_total_weight(text) * 1000 // 200)
+        return f"무뼈닭발 {count}팩"
+
+    # ✅ 마늘가루
+    if "마늘가루" in text:
+        match = re.search(r"(\d+)\s*g", text)
+        return f"마늘가루 {match.group(1)}g" if match else "마늘가루"
+
+    # ✅ 마늘쫑
+    if "마늘쫑" in text:
+        tags = []
+        if any(k in text for k in ["대용량", "업소용", "벌크"]) or re.search(r"\b[5-9]\s*kg\b", text):
+            tags.append("** 업 소 용 **")
+        tags.append("마늘쫑")
+        tags.append(f"{int(extract_total_weight(text))}kg")
+        return " ".join(tags)
+
+    # ✅ 마늘류 (가장 마지막에 처리)
     if "마늘" in text:
         tags = []
         if any(k in text for k in ["대용량", "업소용", "벌크"]) or re.search(r"\b[5-9]\s*kg\b", text):
@@ -48,34 +76,11 @@ def parse_option(text: str) -> str:
         tags.append(f"{int(extract_total_weight(text))}kg")
         return " ".join(tags)
 
-    # 2-2. 마늘쫑
-    if "마늘쫑" in text:
-        tags = []
-        if any(k in text for k in ["대용량", "업소용", "벌크"]) or re.search(r"\b[5-9]\s*kg\b", text):
-            tags.append("** 업 소 용 **")
-        tags.append("마늘쫑")
-        tags.append(f"{int(extract_total_weight(text))}kg")
-        return " ".join(tags)
-
-    # 2-3. 무뼈닭발
-    if "무뼈닭발" in text:
-        match = re.search(r"(\d+)\s*팩", text)
-        count = int(match.group(1)) if match else int(extract_total_weight(text) * 1000 // 200)
-        return f"무뼈닭발 {count}팩"
-
-    # 2-4. 마늘빠삭이
-    if "마늘빠삭이" in text:
-        pcs = re.search(r"(\d+)\s*개입", text)
-        return f"마늘빠삭이 {pcs.group(1)}개입" if pcs else "마늘빠삭이"
-
-    # 2-5. 마늘가루
-    if "마늘가루" in text:
-        match = re.search(r"(\d+)\s*g", text)
-        return f"마늘가루 {match.group(1)}g" if match else "마늘가루"
-
     return text.strip()
 
-# 3. Streamlit 인터페이스
+# ------------------------
+# ✅ Streamlit 인터페이스
+# ------------------------
 st.set_page_config(page_title="garlic spirit | 정제기", layout="centered")
 st.title("🧄 garlic spirit | 정제 전용기")
 
