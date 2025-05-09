@@ -195,20 +195,3 @@ def clean_option_cell(option: str) -> str:
         cleaned.append(parse_by_category(text))
 
     return " + ".join(cleaned)
-# ---------------- 엑셀 파일 불러오기 및 저장 ----------------
-import pandas as pd
-
-def clean_excel_file(input_path: str, output_path: str) -> None:
-    df = pd.read_excel(input_path)
-    option_col = None
-
-    for col in df.columns:
-        if any(key in col for key in ["옵션", "옵션명", "옵션정보"]):
-            option_col = col
-            break
-
-    if not option_col:
-        raise ValueError("정제 가능한 옵션 열이 존재하지 않습니다.")
-
-    df[option_col] = df[option_col].apply(clean_option_cell)
-    df.to_excel(output_path, index=False)
