@@ -1,21 +1,33 @@
-from parsers.order_cleaner import clean_order_file
-from generators.packing_list import generate_packing_list
-from generators.invoice_list import generate_invoice_and_summary
+import streamlit as st
+import tempfile
+import os
+from garlic_cleaner import clean_order_file
 
-def main():
-    # 1. 정제 단계
-    print("📥 [1단계] 발주서 정제 시작")
-    clean_order_file("원본.xlsx", "정제.xlsx")
+st.set_page_config(page_title="마늘귀신 | 옵션 정제기", layout="wide")
+st.title("🧄 마늘귀신 | 옵션 정제기")
+st.caption("발주서 업로드 (.xlsx, .xls, .csv)")
 
-    # 2. 패킹리스트 생성
-    print("📦 [2단계] 패킹리스트 생성")
-    generate_packing_list("정제.xlsx", "패킹리스트.xlsx")
+uploaded_files = st.file_uploader("Drag and drop files here", type=["xlsx", "xls", "csv"], accept_multiple_files=True)
 
-    # 3. 송장리스트 및 요약 생성
-    print("🚚 [3단계] 송장리스트 및 요약 생성")
-    generate_invoice_and_summary(["정제.xlsx"], "송장리스트.xlsx", "송장_요약.xlsx")
+if uploaded_files:
+    st.success(f"{len(uploaded_files)}개 파일 업로드 완료")
+    temp_dir = tempfile.mkdtemp()
 
-    print("✅ 모든 자동화 프로세스 완료!")
+    for uploaded_file in uploaded_files:
+        input_path = os.path.join(temp_dir, uploaded_file.name)
+        output_path = os.path.join(temp_dir, f"정제_{uploaded_file.name}")
 
-if __name__ == "__main__":
-    main()
+        with open(input_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+
+        try:
+            clean_order_file(input_path, output_path)
+            with open(output_path, "rb") as f:
+                st.download_button(
+                    label=f"📥 정제된 파일 다운로드: 정제_{uploaded_file.name}",
+                    data=f,
+                    file_name=f"정제_{uploaded_file.name}",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+        except Exception as e:
+            st.error(f"{uploaded_file.name} 정제 중 오류 발생: {e}")
